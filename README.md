@@ -1,6 +1,6 @@
 # Socket level load balacing between VRFs with eBPF (PoC)
 
-Multi stream applications (like torrent) can benefits from multiple available network. Some of them even have support for multiple NICs yet we have to setup iptables rules to redirect their flows to the right direction (gw) based on the oif, which decided by the application.
+Multi stream applications (like torrent) can benefits from multiple available network. Some of them even have support for multiple NICs yet we have to setup iptables rules to redirect their flows to the right direction (gw) based on the oif, which is decided by the application.
 
 This approach is reusing the generic cgroup v2 eBPF hook support therefore completely agnostic wether the application supports load balancing or not. The eBPF prog attached to a given cgroup (or the cgroup root to system wide operation) and randomly select a VRF for the socket.
 
@@ -16,7 +16,7 @@ The `libbpf` also required, installation guide [here](https://github.com/libbpf/
 
 ## Setup
 
-Lets assume a test setup with a wired network interface `usb0` which actually a shared mobile data and the wireless `wlp1s0` interface which is the built in notebook wifi. The implicit default VRF contains the main routing table, where the network of the `usb0` used as the default route and the wifi as a backup (default linux behavior when both interface active). We have to create a VRF for the wifi where the network of the `wlp1s0` used as default. If we enslave an interface to a VRF, that will override the routing lookups according to the VRF's routing table. 
+Lets assume a test setup with a wired network interface `usb0` which is actually a shared mobile data and the wireless `wlp1s0` interface which is the built in notebook wifi. The implicit default VRF contains the main routing table, where the network of the `usb0` used as the default route and the wifi as a backup (default linux behavior when both interface active). We have to create a VRF for the wifi where the network of the `wlp1s0` used as default. If we enslave an interface to a VRF, that will override the routing lookups according to the VRF's routing table. 
 
 ```
 # VRF setup with routing table id 10
@@ -29,7 +29,7 @@ sudo ip route add 10.0.0.0/24 dev wlp1s0 scope link table 10
 sudo ip route add default via 10.0.0.1 table 10
 ```
 
-The last two commands not required in theory, because when we set the VRF as master for the interface, all routes associated with that interface will be automatically moved to the VRF's table. However for some reason the `scope link` route not moved for me, and we dont have default route either because the main table use the `usb0` route for that.
+The last two commands are not required in theory, because when we set the VRF as master for the interface, all routes are associated with that interface will be automatically moved to the VRF's table. However for some reasons the `scope link` route didn't moved for me, and we didn't have default route either because the main table use the `usb0` route for that.
 
 
 The next step is to create a cgroup for the applications where we want to use the socket loadbalancing. Then we load the eBPF prog, attach it to the cgroup and put a bash into that cgroup. Therefore every application started from that bash will be loadbalanced between the default and the wifi VRFs. Now we do simple round-robing loadbalancing based on a random value but more sofisticated logic could be relaized in the eBPF prog. 
